@@ -4,6 +4,7 @@
 ## Overview
 This tutorial focuses specifically on implementing a complete CI/CD DevOps pipeline for **Power BI Reports** in Microsoft Fabric using Git integration. We'll cover the complete lifecycle management across three environments (DEV, UAT, PROD) with approval processes, including the essential Power BI Desktop configurations needed for seamless integration.
 
+
 ## Architecture Overview - Option 3: Deploy using Fabric Deployment Pipelines
 
 ```

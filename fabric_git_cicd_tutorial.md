@@ -2,6 +2,7 @@
 
 ## Power BI Reports Lifecycle Management
 
+
 ## Overview
 This tutorial focuses specifically on implementing a complete CI/CD DevOps pipeline for **Power BI Reports** in Microsoft Fabric using Git integration and deployment pipelines. We'll cover the complete lifecycle management across three environments (DEV, UAT, PROD) with approval processes, including the essential Power BI Desktop configurations needed for seamless integration.
 
@@ -178,6 +179,7 @@ Environment: PROD
 **The deployment pipeline handles the parameter switching automatically - you don't need conditional logic in Power Query.**
 
 **Step 5: Apply Parameters to Data Sources**
+
 After creating simple parameters, connect them to your data source:
 
 1. **Go to your data source query** (in Power Query Editor)
@@ -201,116 +203,22 @@ Source = Sql.Database(SrvName, DbName)
    <strong>Figure: Power Query Editor &rarr; Source step &rarr; Edit Settings</strong>
 </p>  
 
+**Step 6: Save the report as PBIP**
 
-### Step 2: Report Development Best Practices for Git
-
-#### 2.1 File Organization in Power BI Desktop
-When developing reports for Git integration:
-
-1. **Use Consistent Naming Conventions:**
+Use Consistent Naming Conventions:
    ```
    Report Files:
-   - [ProjectName]_[ReportType]_[Version].pbix
-   - Example: SalesAnalytics_Dashboard_v1.0.pbix
+   - [ProjectName]_[ReportType]_[Version].pbip
+   - Example: SalesAnalytics_Dashboard_v1.0.pbip
    ```
 
-2. **Separate Data Models and Reports:**
-   - Create separate .pbix files for datasets
-   - Create thin reports that connect to published datasets
-   - Use shared datasets across multiple reports
+<p align="center">
+      <img src="images/folder_structure_pbip.png" width="400" alt="Power BI Project"/>
+   </p>
+<p align="center">
+   <strong>Figure: Power BI Project &rarr; Structure of Folders</strong>
+</p>  
 
-3. **Parameter Management:**
-   ```
-   Create parameters for:
-   - Environment URLs
-   - Database connection strings  
-   - API endpoints
-   - Refresh schedules
-   ```
-
-#### 2.2 Dataset Configuration for Multi-Environment
-1. **Create Environment Parameters:**
-   ```
-   Parameter Name: Environment
-   Values: DEV, UAT, PROD
-   
-   Parameter Name: ServerName  
-   Current Value: =switch([Environment], 
-                         "DEV", "dev-sql-server.database.windows.net",
-                         "UAT", "uat-sql-server.database.windows.net", 
-                         "PROD", "prod-sql-server.database.windows.net")
-   ```
-
-2. **Configure Dynamic Data Sources:**
-   - Use parameters in connection strings
-   - Set up conditional refresh logic
-   - Configure gateway connections per environment
-
-### Step 3: Environment Parameters Configuration
-
-#### 3.1 Create Environment Parameters for Multi-Environment Deployment
-1. **In Power BI Desktop, go to Transform Data**
-2. **Create the following parameters:**
-
-   **Environment Parameter:**
-   ```
-   Parameter Name: Environment
-   Type: Text
-   Suggested Values: DEV, UAT, PROD
-   Current Value: DEV
-   Description: Current environment (DEV/UAT/PROD)
-   ```
-
-   **Server Name Parameter:**
-   ```
-   Parameter Name: ServerName
-   Type: Text
-   Current Value: =switch([Environment], 
-                         "DEV", "dev-sql-server.database.windows.net",
-                         "UAT", "uat-sql-server.database.windows.net", 
-                         "PROD", "prod-sql-server.database.windows.net",
-                         "dev-sql-server.database.windows.net")
-   ```
-
-   **Database Name Parameter:**
-   ```
-   Parameter Name: DatabaseName
-   Type: Text  
-   Current Value: =switch([Environment],
-                         "DEV", "SalesDB_DEV",
-                         "UAT", "SalesDB_UAT", 
-                         "PROD", "SalesDB_PROD",
-                         "SalesDB_DEV")
-   ```
-
-#### 3.2 Configure Dynamic Data Sources
-1. **Update Data Source Connections:**
-   - Edit data source queries
-   - Replace hardcoded server/database names with parameters
-   - Test connections with different parameter values
-
-2. **Example SQL Server Connection:**
-   ```sql
-   Source = Sql.Database([ServerName], [DatabaseName])
-   ```
-
-3. **Example REST API Connection:**
-   ```
-   BaseURL Parameter: =switch([Environment],
-                             "DEV", "https://api-dev.company.com",
-                             "UAT", "https://api-uat.company.com", 
-                             "PROD", "https://api.company.com",
-                             "https://api-dev.company.com")
-   ```
-
-#### 3.3 Gateway Configuration per Environment
-1. **Set up On-premises Data Gateway for each environment**
-2. **Configure gateway connections:**
-   - DEV Gateway: Points to development databases
-   - UAT Gateway: Points to UAT databases  
-   - PROD Gateway: Points to production databases
-
-3. **Map data sources to appropriate gateways during deployment**
 
 ## Part 2: Microsoft Fabric Git Configuration for Power BI Reports
 
@@ -319,8 +227,6 @@ When developing reports for Git integration:
 - **Power BI Desktop (Latest Version)** with proper configuration
 - GitHub repository
 - Admin access to Fabric workspaces
-- Power BI Premium Per User (PPU) or Premium capacity
-- Understanding of Power BI report development lifecycle
 
 ### Step 1: Enable Git Integration in Fabric
 
