@@ -32,7 +32,7 @@ Development Flow:
    <summary>Textual Architecture Flow</summary>
    <pre>
 [Power BI Desktop] ←Pull/Push→ [Feature Workspaces] ←Sync→ [Feature Branch]
-                                                                                                   ↓ (Merge)
+         ↓ (Merge)
 [DEV Workspace] ←Sync/Update→ [Main Branch] ←Branch→ [Main Repository]
          ↓ (Deploy)
 [UAT Workspace] 
