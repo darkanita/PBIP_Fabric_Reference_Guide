@@ -217,3 +217,204 @@ Use Consistent Naming Conventions:
 <p align="center">
    <strong>Figure: Power BI Project &rarr; Structure of Folders</strong>
 </p>  
+
+## Part 2: Microsoft Fabric Git Configuration for Power BI Reports
+
+### Prerequisites
+- Microsoft Fabric Premium or Trial capacity
+- **Power BI Desktop (Latest Version)** with proper configuration
+- GitHub repository / Azure Repository for version control
+- Basic understanding of Git concepts (branches, commits, pull requests)
+- Admin access to Fabric workspaces
+- Understanding of Power BI report development lifecycle
+
+### Step 1: Enable Git Integration in Fabric
+
+<p align="center">
+      <img src="images/Tenant_setting_git.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Tenant settings &rarr; Git integration</strong>
+</p>  
+
+<p align="center">
+      <img src="images/create_items_fabric.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Tenant settings &rarr; Users can create Fabric Items</strong>
+</p> 
+
+
+#### 1.1 Tenant Settings Configuration
+First, ensure Git integration is enabled at the tenant level. Git integration settings can be managed at two levels: **Tenant-wide** or **Capacity-specific** through delegated tenant settings.
+
+1. Navigate to **Microsoft Fabric Admin Portal**
+2. Go to **Capacity settings** (as shown in your screenshot)
+3. Select your Fabric capacity
+4. Navigate to **Delegated tenant settings** tab
+5. Find **Git integration** section
+
+**Understanding Delegated Tenant Settings:**
+
+Delegated tenant settings allow capacity admins to **override** tenant-level settings for their specific capacity. This provides more granular control over Git integration.
+
+**Git Integration Settings Configuration:**
+
+**Core Git Integration Settings:**
+- ✅ **"Users can synchronize workspace items with their Git repositories"**
+  - *Can be enabled at tenant level OR capacity level*
+  - Allows import and export of workspace items to Git repositories for collaboration and version control
+  - **Key Setting:** "Override tenant admin selection" ✅ allows capacity-specific configuration
+
+**Configuration Options (as shown in your screenshot):**
+```
+Enabled: ✅ (Toggle enabled for capacity)
+Apply to: 
+• All the users in capacity (recommended for organizational CI/CD)
+○ Specific security groups (for limited rollout)
+□ Except specific security groups (for exclusions)
+
+Delegate setting to other admins:
+✅ Workspace admins can enable/disable (allows workspace-level control)
+```
+<p align="center">
+      <img src="images/Capacity_setting_git.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Capacity settings &rarr; Git integration</strong>
+</p>  
+
+**GitHub-Specific Settings:**
+- ✅ **"Users can sync workspace items with GitHub repositories"**  
+  - *Enabled for all users in capacity*
+  - Users can select GitHub as their Git provider and sync items in their workspaces with GitHub repositories
+  - Must be enabled along with the general Git synchronization setting
+
+**Additional Git Integration Settings:**
+- ✅ **"Users can export items to Git repositories in other geographical locations"**
+  - *Enabled for all users in capacity*
+  - Allows cross-region Git repository connections
+  
+- ✅ **"Users can export workspace items with applied sensitivity labels to Git repositories"**
+  - *Enabled for all users in capacity*
+  - Important for organizations using Microsoft Purview sensitivity labels
+
+**General Fabric Settings:**
+- ✅ **"Users can create Fabric items"**
+  - *Enabled for all users in capacity*
+  - Users can use production-ready features to create Fabric items
+
+**Note: The following settings are only available at TENANT level, not capacity level:**
+
+**Tenant-Only Settings (Configure in Admin Portal → Tenant Settings):**
+- ✅ **"Create workspaces"** 
+  - *Only configurable at tenant level*
+  - Users can create app workspaces to collaborate on dashboards, reports, and other content
+
+  <p align="center">
+      <img src="images/ws_settings_tenant.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Tenant settings &rarr; Create workspaces</strong>
+</p> 
+
+
+**Best Practices for Delegated Tenant Settings:**
+
+1. **Capacity-Level Control:**
+   - Enable Git integration at **capacity level** for better control
+   - Apply to **"All the users in capacity"** for organizational CI/CD
+   - Enable **"Workspace admins can enable/disable"** for flexibility
+
+2. **Security Considerations:**
+   - Use **"Specific security groups"** for phased rollouts
+   - Consider **"Except specific security groups"** for sensitive workspaces
+   - Review sensitivity label integration if using Microsoft Purview
+
+3. **Administrative Delegation:**
+   - ✅ **"Override tenant admin selection"** gives capacity admins control
+   - ✅ **"Workspace admins can enable/disable"** provides workspace-level flexibility
+   - Allows decentralized management while maintaining governance
+
+**Verification Steps:**
+1. **Check capacity assignment:** Ensure your workspaces are assigned to this capacity
+2. **Verify settings cascade:** Capacity settings override tenant settings
+3. **Test workspace access:** Confirm users can see Git integration options
+4. **Validate permissions:** Ensure workspace admins have appropriate delegation rights
+
+> **⚠️ Important:** When using delegated tenant settings at the capacity level, these settings **override** the tenant-wide settings. This means you have more granular control but need to ensure all necessary capacities have the correct configuration for your CI/CD pipeline to work across DEV, UAT, and PROD environments.
+
+#### 2.2 Workspace Structure for Architecture
+For the Fabric deployment pipelines approach, you'll need multiple workspaces to support the complete CI/CD lifecycle. Here's an example of a well-structured workspace organization:
+
+**Example Workspace Structure:**
+
+<p align="center">
+      <img src="images/ws_config_fabric.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspaces</strong>
+</p> 
+
+1. **Development Environment:**
+   ```
+   Workspace Name: FABRIC-CATALYST-GH-DEV
+   Purpose: Main development workspace connected to Git main branch
+   Role: Source workspace for deployment pipeline
+   Git Connection: Connected to main branch
+   ```
+
+2. **Feature Development Workspaces:**
+   ```
+   Workspace Name: FABRIC-CATALYST-GH-FEATURE
+   Purpose: Individual feature development and testing
+   Role: Connected to feature branches for isolated development
+   Git Connection: Connected to feature branches (feature/dashboard, feature/reports, etc.)
+   ```
+
+3. **User Acceptance Testing Environment:**
+   ```
+   Workspace Name: FABRIC-CATALYST-GH-STG (Staging/UAT)
+   Purpose: User acceptance testing and validation
+   Role: Target for DEV deployments, source for PROD deployments
+   Git Connection: Managed through deployment pipeline (no direct Git connection)
+   ```
+
+4. **Production Environment:**
+   ```
+   Workspace Name: FABRIC-CATALYST-GH-PROD
+   Purpose: Live production environment
+   Role: Final deployment target for validated reports
+   Git Connection: Managed through deployment pipeline (no direct Git connection)
+   ```
+
+**Workspace Naming Convention Benefits:**
+✅ **Consistent Prefix:** `FABRIC-CATALYST-GH` identifies the project
+✅ **Clear Environment Identification:** DEV, FEATURE, STG, PROD
+✅ **Git Integration Indicator:** `GH` indicates GitHub integration
+✅ **Professional Structure:** Enterprise-ready naming convention
+
+**Workspace Assignment Requirements:**
+- **All workspaces must be assigned to Premium capacity** (shown by capacity icons in screenshot)
+- **Required for Git integration:** Only Premium capacity workspaces support Git
+- **Required for deployment pipelines:** Both Git and deployment pipelines need Premium
+
+**Workspace Role Mapping:**
+```
+Git Integration Workflow:
+Power BI Desktop → FABRIC-CATALYST-GH-FEATURE → Feature Branch (Git)
+Feature Branch → Main Branch (Pull Request/Merge)
+Main Branch → FABRIC-CATALYST-GH-DEV (Sync/Update)
+
+Deployment Pipeline Workflow:
+FABRIC-CATALYST-GH-DEV → FABRIC-CATALYST-GH-STG → FABRIC-CATALYST-GH-PROD
+(Deploy via Fabric deployment pipelines with approval gates)
+```
+
+**Next Steps for Your Configuration:**
+1. ✅ **Workspaces created** with excellent naming convention
+2. ✅ **Premium capacity assigned** (visible in screenshot)
+3. **Connect FABRIC-CATALYST-GH-DEV to Git main branch**
+4. **Connect FABRIC-CATALYST-GH-FEATURE to feature branches**
+5. **Create deployment pipeline** linking DEV → STG → PROD
+6. **Configure approval gates** for STG and PROD deployments
