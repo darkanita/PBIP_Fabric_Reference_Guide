@@ -389,32 +389,377 @@ For the Fabric deployment pipelines approach, you'll need multiple workspaces to
    ```
 
 **Workspace Naming Convention Benefits:**
-✅ **Consistent Prefix:** `FABRIC-CATALYST-GH` identifies the project
-✅ **Clear Environment Identification:** DEV, FEATURE, STG, PROD
-✅ **Git Integration Indicator:** `GH` indicates GitHub integration
-✅ **Professional Structure:** Enterprise-ready naming convention
+
+- ✅ **Consistent Prefix:** `FABRIC-CATALYST-GH` identifies the project 
+- ✅ **Clear Environment Identification:** DEV, FEATURE, STG, PROD
+- ✅ **Git Integration Indicator:** `GH` indicates GitHub integration
 
 **Workspace Assignment Requirements:**
-- **All workspaces must be assigned to Premium capacity** (shown by capacity icons in screenshot)
-- **Required for Git integration:** Only Premium capacity workspaces support Git
-- **Required for deployment pipelines:** Both Git and deployment pipelines need Premium
+- **All workspaces must be assigned to Fabric capacity** (shown by capacity icons in screenshot)  
+- **Required for Git integration:** To access the Git integration feature, you need a Fabric capacity
+- **Required for deployment pipelines:** Each workspace in the pipeline must reside on a Fabric capacity
 
-**Workspace Role Mapping:**
+**Important Clarification on Deployment Pipelines and Capacity:**
+
+**How Deployment Pipelines Actually Work:**
+
+✅ **Pipeline Infrastructure:** Deployment pipelines are a **SaaS orchestration layer** managed by Microsoft Fabric itself, operating independently of workspace capacities
+
+✅ **Pipeline Execution:** When a pipeline runs:
+- **Orchestration activities** (triggering deployments) are billed to the **source workspace's capacity**
+- **Example:** Deploying from DEV to UAT consumes minimal CU from the DEV workspace capacity
+- The pipeline itself doesn't "reside" on any specific capacity
+
+✅ **Post-Deployment:** After deployment completes:
+- Activities in the **target workspace** (e.g., UAT, PROD) use the **target workspace's capacity**
+- The pipeline itself does not consume resources at this stage
+
+**Capacity Requirements Clarified:**
+
+✅ **Git Integration:** A Fabric capacity is required to use all supported Fabric items and specifically for Git integration features
+
+✅ **Deployment Pipeline Workspaces:** Each workspace participating in the pipeline must be assigned to a Fabric capacity
+
+✅ **Pipeline Orchestration:** The deployment pipeline service itself is managed by Microsoft Fabric (no capacity assignment needed)
+
+✅ **Active Capacity for Execution:** The source workspace capacity must be active during deployment execution
+
+✅ **Fabric vs Premium Capacity:** Customers that already have a Power BI Premium capacity, can use that capacity, but keep in mind that certain Power BI SKUs only support Power BI items
+
+**Operational Requirements:**
+- **Source Capacity Active:** The capacity hosting the source workspace must be active during deployment
+- **Target Capacity Active:** The capacity hosting the target workspace must be active to receive deployment
+- **Multi-Environment:** All workspace capacities (DEV, UAT, PROD) must be active for the complete pipeline
+- **Cost Consideration:** Deployment orchestration consumes minimal CUs from source workspace capacity
+
+**Next Steps:**
+
+Now that you have your workspace structure and .pbip project ready, here are the specific next steps to implement your CI/CD strategy:
+
+**Step 3: Connect FABRIC-CATALYST-GH-DEV to Git main branch**
+- Navigate to `FABRIC-CATALYST-GH-DEV` workspace settings
+- Go to Git integration tab
+- Connect to your GitHub repository `main` branch
+- This workspace will be the source for your deployment pipeline
+
+**Step 4: Connect FABRIC-CATALYST-GH-FEATURE to feature branches**
+- Navigate to `FABRIC-CATALYST-GH-FEATURE` workspace settings  
+- Go to Git integration tab
+- Connect to your GitHub repository `feature/financial-sales-analytics` branch
+- Publish your `FinancialSalesAnalytics_Dashboard_v1.0.pbip` here
+- Perform initial sync: Workspace → Git
+
+**Step 5: Create deployment pipeline linking DEV → STG → PROD**
+- Navigate to Deployment Pipelines in Fabric
+- Create new pipeline: "FABRIC-CATALYST-Pipeline"
+- Configure three stages:
+  - Development: `FABRIC-CATALYST-GH-DEV`
+  - Test: `FABRIC-CATALYST-GH-STG` 
+  - Production: `FABRIC-CATALYST-GH-PROD`
+
+**Step 6: Configure approval gates for STG and PROD deployments**
+- Set up manual approval for DEV → STG deployment
+- Set up multi-stage approval for STG → PROD deployment
+- Configure approval notifications and criteria
+
+**Implementation Sequence:**
 ```
-Git Integration Workflow:
-Power BI Desktop → FABRIC-CATALYST-GH-FEATURE → Feature Branch (Git)
-Feature Branch → Main Branch (Pull Request/Merge)
-Main Branch → FABRIC-CATALYST-GH-DEV (Sync/Update)
-
-Deployment Pipeline Workflow:
-FABRIC-CATALYST-GH-DEV → FABRIC-CATALYST-GH-STG → FABRIC-CATALYST-GH-PROD
-(Deploy via Fabric deployment pipelines with approval gates)
+Current Status: 
+✅ Workspaces created, .pbip project ready
+Next Actions:
+1. Git Integration Setup (Steps 3-4)
+2. Feature Development & PR Workflow  
+3. Deployment Pipeline Creation (Steps 5-6)
+4. End-to-End Testing
 ```
 
-**Next Steps for Your Configuration:**
-1. ✅ **Workspaces created** with excellent naming convention
-2. ✅ **Premium capacity assigned** (visible in screenshot)
-3. **Connect FABRIC-CATALYST-GH-DEV to Git main branch**
-4. **Connect FABRIC-CATALYST-GH-FEATURE to feature branches**
-5. **Create deployment pipeline** linking DEV → STG → PROD
-6. **Configure approval gates** for STG and PROD deployments
+These steps will complete your architecture implementation and enable the full Feature → DEV → UAT → PROD workflow with Git version control and approval gates.
+
+### Step 2: Connect DEV Workspace to GitHub
+
+#### 2.1 Prepare GitHub Repository for Power BI Reports
+1. Create a new GitHub repository or use existing one
+2. **Power BI-focused repository structure:**
+   ```
+   PBIP_Fabric_Reference_Guide/
+   ├── .github/
+   │   └── workflows/
+   │       ├── dev-to-uat-reports.yml
+   │       └── uat-to-prod-reports.yml
+   ├── fabric/
+   │   ├── workspace/
+   │   │   ├── FinancialSalesAnalytics_Dashboard_v1.0.Report/
+   │   │   └── FinancialSalesAnalytics_Dashboard_v1.0.SemanticModel/
+   ├── scripts/
+   │   └── deployall.ps1
+   ├── .gitignore                    # ← Important for security
+   └── README.md
+   ```
+
+3. **Security Best Practices - Do NOT store sensitive information in Git:**
+
+   **❌ Never commit these to your repository:**
+   - Database connection strings
+   - Server URLs or endpoints
+   - Workspace names or IDs
+   - Authentication tokens or passwords
+   - Capacity identifiers
+   - Environment-specific configuration files with real values
+
+   **✅ Secure Alternatives:**
+
+   **Option 1: Use Template Configuration Files**
+   Create template files with placeholder values:
+   ```json
+   // config/template-config.json (safe to commit)
+   {
+     "environment": "TEMPLATE",
+     "workspace": "PROJECT-NAME-{ENVIRONMENT}",
+     "dataSourceSettings": {
+       "serverName": "{SERVER-ENDPOINT-PLACEHOLDER}",
+       "databaseName": "{DATABASE-NAME-PLACEHOLDER}"
+     }
+   }
+   ```
+
+   **Option 2: Documentation-Only Approach**
+   Create documentation that describes the configuration without real values:
+   ```markdown
+   # Environment Configuration Guide
+   
+   ## Parameter Mapping
+   Each environment requires the following parameters to be configured
+   in the Fabric deployment pipeline:
+   
+   - SrvName: Fabric SQL endpoint for the environment
+   - DbName: Database identifier for the environment  
+   - Environment: Environment identifier (DEV/UAT/PROD)
+   
+   ## Deployment Pipeline Configuration
+   Configure parameter rules in Fabric deployment pipeline to automatically
+   update these values during deployment between environments.
+   ```
+
+   **Option 3: Use GitHub Secrets (for CI/CD automation)**
+   Store sensitive values as GitHub repository secrets:
+   - `DEV_SERVER_NAME`
+   - `UAT_SERVER_NAME`  
+   - `PROD_SERVER_NAME`
+   - Reference these in GitHub Actions workflows without exposing values
+
+   **Option 4: Fabric-Native Parameter Management**
+   Let Fabric deployment pipelines handle all environment-specific configurations:
+   - Configure parameter rules directly in the deployment pipeline
+   - No configuration files needed in Git
+   - All sensitive values managed within Fabric's secure environment
+
+**In this reference guide we will use Option 4:**
+
+We will use **Option 4 (Fabric-Native Parameter Management)** as it's the most secure and aligns with Fabric's built-in capabilities. The deployment pipeline automatically handles parameter updates without requiring any sensitive information in your Git repository.
+
+#### 2.2 Connect Workspace to Git
+1. **In your DEV Workspace:**
+   - Click on **Workspace settings**
+   - Select **Git integration** tab
+   - Click **Connect to Git**
+
+2. **Configure Git Connection:**
+   ```
+   Git provider: GitHub
+   Organization: [your-github-org]
+   Repository: [your-repo-name]
+   Branch: main (or dev)
+   Folder: / (root) or specify subfolder
+   ```
+
+3. **Authentication:**
+   - You'll be redirected to GitHub for authentication
+   - Grant necessary permissions to Microsoft Fabric
+
+<p align="center">
+      <img src="images/git_integration_dev_ws.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspaces DEV &rarr; Git integration</strong>
+</p>    
+
+#### 2.3 Initial Sync - Feature Branch Workflow
+When implementing the architecture defined, your first sync will typically be from a **Feature workspace to Feature branch**.
+
+**Typical First Sync Scenario:**
+1. **Develop locally:** Create your `FinancialSalesAnalytics_Dashboard_v1.0.pbip` in Power BI Desktop
+2. **Publish to Feature workspace:** Upload your .pbip to `FABRIC-CATALYST-GH-FEATURE` workspace
+3. **Connect workspace to Git:** Connect the Feature workspace to a feature branch
+4. **Initial sync:** Sync from workspace to Git (since workspace has content, Git branch is empty)
+
+**After Initial Sync:** Go to GitHub Repository and validate the Feature Branch Structure.
+
+<p align="center">
+      <img src="images/git_integration_feature_ws.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspaces Feature &rarr; Git integration</strong>
+</p>
+
+**Next Steps in Feature Development:**
+1. **Continue development** in Feature workspace
+2. **Regular commits** to feature branch as you make changes
+3. **Create Pull Request** when feature is ready
+4. **Merge to main branch** (triggers DEV workspace update)
+5. **Deploy via pipeline** from DEV → UAT → PROD
+
+### Step 3: Git Branch Strategy
+
+#### 3.1 Branch Structure for Feature → DEV Workflow
+```
+main (production-ready code) ← Connected to FABRIC-CATALYST-GH-DEV workspace
+└── feature ← Connected to FABRIC-CATALYST-GH-FEATURE workspace
+```
+
+#### 3.2 Workspace-to-Branch Mapping
+```
+Git Branch                          ↔ Fabric Workspace
+────────────────────────────────────────────────────────────
+main                               ↔ FABRIC-CATALYST-GH-DEV (Pipeline Source)
+feature                            ↔ FABRIC-CATALYST-GH-FEATURE
+```
+
+#### 3.3 Your Development Workflow
+
+**Phase 1: Feature Development**
+1. **Develop locally:** Create `FinancialSalesAnalytics_Dashboard_v1.0.pbip` in Power BI Desktop
+2. **Publish to Feature workspace:** Upload to `FABRIC-CATALYST-GH-FEATURE`
+3. **Connect Feature workspace to Git:**
+   - Connect `FABRIC-CATALYST-GH-FEATURE` → `feature` branch
+   - Initial sync: Workspace → Git (pushes your dashboard to feature branch)
+
+**Phase 2: Git Configuration** 
+4. **Connect DEV workspace to Git:**
+   - Connect `FABRIC-CATALYST-GH-DEV` → `main` branch
+   - This workspace will receive updates when feature branches merge to main
+
+**Phase 3: Feature Integration**
+5. **Create Pull Request:**
+   - From: `feature` 
+   - To: `main` branch
+   - Include description of dashboard features and changes
+
+6. **Code Review & Merge:**
+   - Team reviews the Power BI changes (.pbir and .pbids files)
+   - Approve and merge PR to main branch
+   - This automatically triggers DEV workspace update
+
+<p align="center">
+      <img src="images/ws_dev_sync_git.png" width="400" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspaces Feature &rarr; Git integration</strong>
+</p>
+
+
+**Phase 4: Deployment Pipeline**
+
+7. **DEV workspace updates automatically** when main branch changes
+8. **Use Fabric deployment pipeline** to promote: DEV → UAT → PROD
+
+
+**Key Benefits of This Approach:**
+
+- ✅ **Isolated Development:** Feature workspace provides safe development environment
+- ✅ **Version Control:** All changes tracked in Git with proper branching
+- ✅ **Code Review:** PR process ensures quality before DEV integration
+- ✅ **Automated Integration:** Main branch updates automatically sync to DEV workspace
+- ✅ **Deployment Pipeline:** Clean handoff from Git to Fabric deployment pipelines
+
+## Part 3: Fabric Deployment Pipelines Configuration
+
+### Step 1: Create Fabric Deployment Pipeline
+1. **Navigate to Deployment Pipelines in Microsoft Fabric**
+2. **Create new deployment pipeline:**
+   ```
+   Pipeline name: PowerBI-Reports-Lifecycle
+   Description: Automated deployment from DEV to UAT to PROD
+   Pipeline Type: Standard (3-stage pipeline)
+   ```
+
+### Step 2: Configure Three-Stage Pipeline
+1. **Set up pipeline stages:**
+   ```
+   Stage 1: DEV
+   - Workspace: FABRIC-CATALYST-GH-DEV
+   - Source: Connected to Git main branch
+   - Role: Source workspace for all deployments
+
+   Stage 2: UAT
+   - Workspace: FABRIC-CATALYST-GH-UAT
+   - Source: Deployed from DEV stage
+   - Role: User acceptance testing environment
+   
+   Stage 3: PROD
+   - Workspace: FABRIC-CATALYST-GH-PROD
+   - Source: Deployed from UAT stage
+   - Role: Live production environment
+   ```
+
+2. **Assign workspaces to stages:**
+   - Development stage → FABRIC-CATALYST-GH-DEV (Git connected)
+   - Test stage → FABRIC-CATALYST-GH-UAT (Pipeline managed)
+   - Production stage → FABRIC-CATALYST-GH-PROD (Pipeline managed)
+
+<p align="center">
+      <img src="images/Deployment_pipeline.png" width="400" alt="Power BI Project"/>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Deployment Pipeline</strong>
+</p>
+
+### Step 3: Configure Deployment Rules
+
+**⚠️ Important:** Deployment rules can only be configured AFTER the first deployment. You must complete an initial deployment without rules first.
+
+#### 3.1 Initial Deployment (Without Rules)
+**First, deploy your content without any rules configured:**
+
+1. **Select Power BI items to deploy:**
+   - ✅ Power BI Reports (FinancialSalesAnalytics_Dashboard_v1.0)
+   - ✅ Power BI Datasets/Semantic Models (FinancialSalesAnalytics_Dashboard_v1.0)
+   - ✅ Any dataflows (if used)
+   - ✅ Report metadata and themes
+
+2. **Perform initial deployment:**
+   - Deploy from DEV → UAT without any parameter rules
+   - This copies items with their current DEV parameter values
+   - Items will initially use DEV database connections in UAT (expected)
+
+3. **Verify successful deployment:**
+   - Check that items appear in UAT workspace
+   - Confirm deployment shows "Successful deployment" status
+
+#### 3.2 Configure Parameter Rules (After First Deployment)
+**Only after successful deployment, configure parameter mapping rules:**
+
+1. **Access deployment rules:**
+   - Go to your deployment pipeline
+   - Click on "Deployment rules" for the UAT stage
+   - Select your semantic model (FinancialSalesAnalytics_Dashboard_v1.0)
+
+2. **Configure parameter mappings:**
+   ```
+   Parameter Rules Configuration:
+   ─────────────────────────────────
+   Parameter Name: Environment
+   DEV Value: DEV → UAT Value: UAT
+   
+   Parameter Name: SrvName  
+   DEV Value: dev-server-endpoint → UAT Value: uat-server-endpoint
+   
+   Parameter Name: DbName
+   DEV Value: dev-database-id → UAT Value: uat-database-id
+   ```
+
+3. **Save parameter rules**
+
+<p align="center">
+      <img src="images/Parameter_Rules.png" width="400" alt="Power BI Project"/>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Deployment Pipeline &rarr; Parameter Rules</strong>
+</p>
