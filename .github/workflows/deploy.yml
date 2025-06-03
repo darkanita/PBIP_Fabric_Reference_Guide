@@ -37,7 +37,24 @@ jobs:
             --resource=https://api.fabric.microsoft.com \
             --query accessToken -o tsv)
 
-          echo "🔗 Step 1: Connecting Git..."
+      - name: 🔗 Connect workspace to GitHub (using configured connection)
+        env:
+          FABRIC_TOKEN: ${{ steps.fabric-auth.outputs.token }}
+          WORKSPACE_ID: ${{ secrets.DEV_WORKSPACE_ID }}
+          CONNECTION_ID: "8380d496-0559-4ee8-b0c6-889f783ac795"
+        run: |
+          echo "Connecting Git with connectionId=$CONNECTION_ID"
+
           curl -X POST "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/connect" \
             -H "Authorization: Bearer $FABRIC_TOKEN" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json" \
+            --data "{
+              \"gitProviderDetails\": {
+                \"gitProviderType\": \"GitHub\"
+              },
+              \"myGitCredentials\": {
+                \"configuredConnectionGitCredentials\": {
+                  \"connectionId\": \"$CONNECTION_ID\"
+                }
+              }
+            }"
