@@ -25,14 +25,16 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: 📡 Call Microsoft Fabric API
+      - name: 📡 Get Fabric Access Token and check Git status
+        env:
+          WORKSPACE_ID: ${{ secrets.DEV_WORKSPACE_ID }}
         run: |
-          echo "🔎 Getting access token for Fabric..."
+          echo "🔐 Getting access token for Fabric..."
           FABRIC_TOKEN=$(az account get-access-token \
             --resource=https://api.fabric.microsoft.com \
             --query accessToken -o tsv)
 
-          echo "📥 Listing Fabric workspaces..."
-          curl -X GET "https://api.fabric.microsoft.com/v1/workspaces" \
+          echo "📂 Checking Git status for workspace: $WORKSPACE_ID"
+          curl -X GET "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/status" \
             -H "Authorization: Bearer $FABRIC_TOKEN" \
             -H "Content-Type: application/json"
