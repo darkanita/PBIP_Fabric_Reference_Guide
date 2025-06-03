@@ -10,6 +10,27 @@ on:
     types: [ closed ]
     paths:
       - 'fabric/**'
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force sync even if no changes detected'
+        type: boolean
+        default: false
+        required: false
+      target_folder:
+        description: 'Specific folder to sync (leave empty for all fabric folder changes)'
+        type: string
+        default: 'fabric'
+        required: false
+      sync_mode:
+        description: 'Sync operation mode'
+        type: choice
+        default: 'auto'
+        required: false
+        options:
+          - 'auto'
+          - 'force_update_from_git'
+          - 'check_status_only'
 
 env:
   FABRIC_API_BASE: "https://api.fabric.microsoft.com/v1"
@@ -18,8 +39,13 @@ jobs:
   auto-sync-dev-workspace:
     name: Auto-Sync DEV Workspace from Git
     runs-on: ubuntu-latest
-    # Only run on main branch pushes or when PR is merged to main
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
+    # Run on main branch pushes, merged PRs, or manual workflow dispatch
+    if: |
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'push' || 
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+        github.event_name == 'workflow_dispatch'
+      )
     
     steps:
       - name: Checkout repository
@@ -32,17 +58,45 @@ jobs:
         run: |
           echo "🔍 Detecting changes in fabric folder..."
           
+          # Check if this is a manual run
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "🔧 Manual workflow dispatch detected"
+            echo "Force sync: ${{ github.event.inputs.force_sync }}"
+            echo "Target folder: ${{ github.event.inputs.target_folder }}"
+            echo "Sync mode: ${{ github.event.inputs.sync_mode }}"
+            
+            if [ "${{ github.event.inputs.force_sync }}" = "true" ]; then
+              echo "sync_needed=true" >> $GITHUB_OUTPUT
+              echo "changed_files=Manual sync - force enabled" >> $GITHUB_OUTPUT
+              echo "🚀 Force sync enabled - proceeding with sync operation"
+              exit 0
+            fi
+            
+            if [ "${{ github.event.inputs.sync_mode }}" = "check_status_only" ]; then
+              echo "sync_needed=check_only" >> $GITHUB_OUTPUT
+              echo "🔍 Status check only mode - will check Git status without syncing"
+              exit 0
+            fi
+          fi
+          
+          # Detect changes for automatic triggers
+          TARGET_FOLDER="${{ github.event.inputs.target_folder || 'fabric' }}"
+          echo "Checking for changes in: $TARGET_FOLDER/"
+          
           if [ "${{ github.event_name }}" == "push" ]; then
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '^fabric/' || true)
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^$TARGET_FOLDER/" || true)
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep "^$TARGET_FOLDER/" || true)
           else
-            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep '^fabric/' || true)
+            # Manual dispatch without force - check for any recent changes
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep "^$TARGET_FOLDER/" || true)
           fi
           
           if [ -z "$CHANGED_FILES" ]; then
-            echo "ℹ️ No changes in fabric folder, skipping sync"
+            echo "ℹ️ No changes in $TARGET_FOLDER folder, skipping sync"
             echo "sync_needed=false" >> $GITHUB_OUTPUT
           else
-            echo "📊 Files changed in fabric folder:"
+            echo "📊 Files changed in $TARGET_FOLDER folder:"
             echo "$CHANGED_FILES"
             echo "sync_needed=true" >> $GITHUB_OUTPUT
             echo "changed_files<<EOF" >> $GITHUB_OUTPUT
