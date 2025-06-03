@@ -54,8 +54,9 @@ jobs:
         id: auth
         if: steps.detect-changes.outputs.sync_needed == 'true'
         run: |
-          echo "🔐 Authenticating with Microsoft Fabric..."
+          echo "🔐 Authenticating with Microsoft Fabric using Service Principal..."
           
+          # Get access token for Fabric API
           ACCESS_TOKEN=$(curl -s -X POST \
             "https://login.microsoftonline.com/${{ secrets.FABRIC_TENANT_ID }}/oauth2/v2.0/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
@@ -63,74 +64,106 @@ jobs:
             | jq -r '.access_token')
             
           if [ "$ACCESS_TOKEN" = "null" ] || [ -z "$ACCESS_TOKEN" ]; then
-            echo "❌ Authentication failed"
+            echo "❌ Fabric API authentication failed"
             exit 1
           fi
           
-          echo "✅ Authentication successful"
+          echo "✅ Fabric API authentication successful"
           echo "::add-mask::$ACCESS_TOKEN"
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+          echo "fabric_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Check Git Status in DEV Workspace
-        id: git-status
+      - name: Check Git Connection Status
+        id: git-connection
         if: steps.detect-changes.outputs.sync_needed == 'true'
         env:
-          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FABRIC_TOKEN: ${{ steps.auth.outputs.fabric_token }}
         run: |
-          echo "📊 Checking Git status in DEV workspace..."
+          echo "📊 Checking Git connection status for workspace..."
           
-          RESPONSE=$(curl -s -X GET \
+          # Use official Fabric Git API
+          GIT_STATUS=$(curl -s -X GET \
             "${{ env.FABRIC_API_BASE }}/workspaces/${{ secrets.DEV_WORKSPACE_ID }}/git/status" \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Authorization: Bearer $FABRIC_TOKEN" \
             -H "Content-Type: application/json")
           
-          echo "Git Status Response: $RESPONSE"
+          echo "Git Status Response: $GIT_STATUS"
           
-          # Extract sync status from response
-          SYNC_REQUIRED=$(echo "$RESPONSE" | jq -r 'if .workspaceHead != .gitHead then "true" else "false" end')
+          # Check for errors
+          ERROR_CODE=$(echo "$GIT_STATUS" | jq -r '.errorCode // empty')
           
-          if [ "$SYNC_REQUIRED" = "false" ]; then
-            echo "sync_required=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ Workspace is already up-to-date with Git"
+          if [ "$ERROR_CODE" = "GitCredentialsNotConfigured" ]; then
+            echo "❌ Service principal Git credentials issue detected"
+            echo "🔧 Need to configure Git credentials for service principal"
+            echo "git_configured=false" >> $GITHUB_OUTPUT
+            
+            # Try to get connection info to diagnose
+            CONNECTION_INFO=$(curl -s -X GET \
+              "${{ env.FABRIC_API_BASE }}/workspaces/${{ secrets.DEV_WORKSPACE_ID }}/git/connection" \
+              -H "Authorization: Bearer $FABRIC_TOKEN" \
+              -H "Content-Type: application/json")
+            
+            echo "Git Connection Info: $CONNECTION_INFO"
+            
           else
-            echo "sync_required=true" >> $GITHUB_OUTPUT
-            echo "📥 Workspace sync is required"
+            echo "✅ Git connection is properly configured"
+            echo "git_configured=true" >> $GITHUB_OUTPUT
+            
+            # Check if sync is actually needed
+            WORKSPACE_HEAD=$(echo "$GIT_STATUS" | jq -r '.workspaceHead // empty')
+            GIT_HEAD=$(echo "$GIT_STATUS" | jq -r '.gitHead // empty')
+            
+            if [ "$WORKSPACE_HEAD" != "$GIT_HEAD" ] && [ -n "$WORKSPACE_HEAD" ] && [ -n "$GIT_HEAD" ]; then
+              echo "sync_required=true" >> $GITHUB_OUTPUT
+              echo "📥 Workspace sync is required"
+            else
+              echo "sync_required=false" >> $GITHUB_OUTPUT
+              echo "ℹ️ Workspace is already up-to-date with Git"
+            fi
           fi
 
       - name: Auto-Sync Workspace from Git
-        if: steps.detect-changes.outputs.sync_needed == 'true' && steps.git-status.outputs.sync_required == 'true'
+        if: steps.detect-changes.outputs.sync_needed == 'true' && steps.git-connection.outputs.git_configured == 'true' && steps.git-connection.outputs.sync_required == 'true'
         env:
-          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FABRIC_TOKEN: ${{ steps.auth.outputs.fabric_token }}
         run: |
           echo "🔄 Auto-syncing DEV workspace from Git (main branch)..."
           echo "Workspace: FABRIC-CATALYST-GH-DEV"
           echo "Changed files in fabric folder:"
           echo "${{ steps.detect-changes.outputs.changed_files }}"
           
-          # Trigger updateFromGit operation
+          # Trigger updateFromGit operation using official Fabric Git API
           SYNC_RESPONSE=$(curl -s -X POST \
             "${{ env.FABRIC_API_BASE }}/workspaces/${{ secrets.DEV_WORKSPACE_ID }}/git/updateFromGit" \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Authorization: Bearer $FABRIC_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{}')
           
           echo "Sync Response: $SYNC_RESPONSE"
           
-          # Check if sync was successful
-          ERROR_MESSAGE=$(echo "$SYNC_RESPONSE" | jq -r '.error.message // empty')
+          # Check for errors
+          ERROR_CODE=$(echo "$SYNC_RESPONSE" | jq -r '.errorCode // empty')
+          ERROR_MESSAGE=$(echo "$SYNC_RESPONSE" | jq -r '.message // empty')
           
-          if [ -n "$ERROR_MESSAGE" ]; then
-            echo "❌ Sync failed: $ERROR_MESSAGE"
+          if [ -n "$ERROR_CODE" ]; then
+            echo "❌ Sync failed: $ERROR_CODE"
+            echo "Error message: $ERROR_MESSAGE"
+            
+            if [ "$ERROR_CODE" = "GitCredentialsNotConfigured" ]; then
+              echo ""
+              echo "🔧 SOLUTION REQUIRED:"
+              echo "1. Service principal needs to be manually connected to Git"
+              echo "2. Or use a user account instead of service principal"
+              echo "3. Or set up GitHub App authentication"
+            fi
             exit 1
           else
             echo "✅ Workspace sync initiated successfully"
-            echo "operation_id=$(echo "$SYNC_RESPONSE" | jq -r '.id // "unknown"')" >> $GITHUB_OUTPUT
           fi
 
       - name: Verify Sync Completion
-        if: steps.detect-changes.outputs.sync_needed == 'true' && steps.git-status.outputs.sync_required == 'true'
+        if: steps.detect-changes.outputs.sync_needed == 'true' && steps.git-connection.outputs.git_configured == 'true' && steps.git-connection.outputs.sync_required == 'true'
         env:
-          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FABRIC_TOKEN: ${{ steps.auth.outputs.fabric_token }}
         run: |
           echo "⏳ Waiting for sync operation to complete..."
           
@@ -138,16 +171,18 @@ jobs:
           for i in {1..20}; do
             sleep 15
             
+            # Check status using official Fabric Git API
             STATUS_RESPONSE=$(curl -s -X GET \
               "${{ env.FABRIC_API_BASE }}/workspaces/${{ secrets.DEV_WORKSPACE_ID }}/git/status" \
-              -H "Authorization: Bearer $ACCESS_TOKEN")
+              -H "Authorization: Bearer $FABRIC_TOKEN")
             
             echo "Status check $i/20: Checking sync progress..."
             
             # Check if sync is complete (workspace and git heads match)
-            SYNC_STATUS=$(echo "$STATUS_RESPONSE" | jq -r 'if .workspaceHead == .gitHead then "complete" else "pending" end')
+            WORKSPACE_HEAD=$(echo "$STATUS_RESPONSE" | jq -r '.workspaceHead // empty')
+            GIT_HEAD=$(echo "$STATUS_RESPONSE" | jq -r '.gitHead // empty')
             
-            if [ "$SYNC_STATUS" = "complete" ]; then
+            if [ "$WORKSPACE_HEAD" = "$GIT_HEAD" ] && [ -n "$WORKSPACE_HEAD" ]; then
               echo "✅ Sync completed successfully!"
               echo "🎯 DEV workspace is now up-to-date with main branch"
               break
@@ -159,6 +194,24 @@ jobs:
               echo "Please check the workspace manually if needed"
             fi
           done
+
+      - name: Handle Git Credentials Issue
+        if: steps.detect-changes.outputs.sync_needed == 'true' && steps.git-connection.outputs.git_configured == 'false'
+        run: |
+          echo "❌ Git credentials not configured for service principal"
+          echo ""
+          echo "🔧 SOLUTIONS:"
+          echo "1. Manual Git connection setup required:"
+          echo "   - Sign into Fabric with user account"
+          echo "   - Go to DEV workspace → Settings → Git integration"
+          echo "   - Disconnect and reconnect to GitHub repository"
+          echo ""
+          echo "2. Alternative: Use GitHub App authentication instead of service principal"
+          echo ""
+          echo "3. Alternative: Use dedicated service user account with PAT"
+          echo ""
+          echo "ℹ️ This is a one-time setup issue that can be resolved manually"
+          exit 1
 
       - name: Summary Report
         if: always() && steps.detect-changes.outputs.sync_needed == 'true'
