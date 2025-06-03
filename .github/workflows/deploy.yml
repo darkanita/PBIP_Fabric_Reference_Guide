@@ -37,18 +37,7 @@ jobs:
             --resource=https://api.fabric.microsoft.com \
             --query accessToken -o tsv)
 
-          echo "🚀 Calling Git initializeConnection"
-          curl -X POST "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/initializeConnection" \
-            -H "Authorization: Bearer $FABRIC_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"repositoryWebUrl\": \"$REPO_URL\",
-              \"branchName\": \"$BRANCH\",
-              \"folderPath\": \"$DIRECTORY\",
-              \"gitProvider\": \"GitHub\"
-            }"
-
-          echo "🔎 Getting Git credentials for workspace..."
-          curl -X GET "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/myGitCredentials" \
+          echo "🔗 Step 1: Connecting Git..."
+          curl -X POST "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/connect" \
             -H "Authorization: Bearer $FABRIC_TOKEN" \
             -H "Content-Type: application/json"
