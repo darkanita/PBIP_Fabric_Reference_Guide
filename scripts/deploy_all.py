@@ -204,7 +204,7 @@ class FabricDeployment:
         """
         url = f"{self.base_url}/operations/{operation_id}"
         
-        max_attempts = 120  # Maximum 10 minutes (120 * 5 seconds)
+        max_attempts = 240  # Maximum 20 minutes (240 * 5 seconds)
         attempts = 0
         
         while attempts < max_attempts:
@@ -217,12 +217,12 @@ class FabricDeployment:
                 
                 print(f"Operation Status: {status}")
                 
-                if status in ['NotStarted', 'Executing']:
+                if status in ['NotStarted', 'Executing', 'Running']:
                     print("Waiting for operation to complete...")
                     time.sleep(5)
                     attempts += 1
                     continue
-                elif status == 'Succeeded':
+                elif status in ['Succeeded', 'Completed']:
                     print("Deployment completed successfully!")
                     return True
                 else:
