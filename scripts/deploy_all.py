@@ -184,7 +184,7 @@ def main():
     client_secret = os.getenv('CLIENT_SECRET')
     pipeline_name = os.getenv('PIPELINE_NAME')
     stage_order = int(os.getenv('STAGE_ORDER', '0'))
-    print("Pipeline name> ",pipeline_name)
+
     # If not in environment variables, try command line arguments
     if not all([tenant_id, app_id, client_secret, pipeline_name]):
         if len(sys.argv) >= 5:
