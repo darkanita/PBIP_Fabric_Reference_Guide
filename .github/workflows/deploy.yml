@@ -25,16 +25,30 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: 📡 Get Fabric Access Token and check Git status
+      - name: 📡 Initialize Git connection
         env:
           WORKSPACE_ID: ${{ secrets.DEV_WORKSPACE_ID }}
+          REPO_URL: "https://github.com/darkanita/PBIP_Fabric_Reference_Guide"
+          BRANCH: "main"
+          DIRECTORY: "fabric/workspace"
         run: |
-          echo "🔐 Getting access token for Fabric..."
+          echo "🔐 Getting token..."
           FABRIC_TOKEN=$(az account get-access-token \
             --resource=https://api.fabric.microsoft.com \
             --query accessToken -o tsv)
 
-          echo "📂 Checking Git status for workspace: $WORKSPACE_ID"
-          curl -X GET "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/status" \
+          echo "🚀 Calling Git initializeConnection"
+          curl -X POST "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/initializeConnection" \
+            -H "Authorization: Bearer $FABRIC_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"repositoryWebUrl\": \"$REPO_URL\",
+              \"branchName\": \"$BRANCH\",
+              \"folderPath\": \"$DIRECTORY\",
+              \"gitProvider\": \"GitHub\"
+            }"
+
+          echo "🔎 Getting Git credentials for workspace..."
+          curl -X GET "https://api.fabric.microsoft.com/v1/workspaces/$WORKSPACE_ID/git/myGitCredentials" \
             -H "Authorization: Bearer $FABRIC_TOKEN" \
             -H "Content-Type: application/json"
