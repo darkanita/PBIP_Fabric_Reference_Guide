@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "FinancialSalesAnalytics_Dashboard_v1.0"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "4aa4b347-f3ed-9fb6-4da7-55d5b89fce01"
+  }
+}

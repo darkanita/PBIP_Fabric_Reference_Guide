@@ -1,0 +1,24 @@
+/// Current deployment environment (DEV, UAT, or PROD)
+expression Environment = "dev" meta [IsParameterQuery=true, List={"dev", "uat", "prod"}, DefaultValue="dev", Type="Text", IsParameterQueryRequired=true]
+	lineageTag: cf916c23-d1cb-4588-9ebf-b04eec1d4927
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text
+
+/// Fabric SQL Database server endpoint
+expression SrvName = "s4342bcgc3cenjumneks7776u4-prmfamhtguoehpihjhg432pbzy.database.fabric.microsoft.com" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: f0d40d4e-3ef6-4908-ad0e-aa24cac2b736
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text
+
+/// Fabric SQL Database name
+expression DbName = "adventureworks-c8183009-e724-41c6-b2e1-d0b4733e20c7" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 9f0cc2e1-32c3-4d63-9d4d-63750f328e72
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Text
+
