@@ -76,6 +76,38 @@ class FabricDeployment:
             print(f"Error fetching deployment pipelines: {e}")
             return None
     
+    def get_pipeline_stages(self, pipeline_id: str) -> Optional[list]:
+        """
+        Get deployment pipeline stages using Fabric API
+        """
+        url = f"{self.base_url}/deploymentPipelines/{pipeline_id}/stages"
+        
+        try:
+            response = requests.get(url, headers=self.get_headers())
+            response.raise_for_status()
+            
+            stages_data = response.json()
+            return stages_data.get('value', [])
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching pipeline stages: {e}")
+            return None
+        """
+        Get all deployment pipelines using Fabric API
+        """
+        url = f"{self.base_url}/deploymentPipelines"
+        
+        try:
+            response = requests.get(url, headers=self.get_headers())
+            response.raise_for_status()
+            
+            pipelines_data = response.json()
+            return pipelines_data.get('value', [])
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching deployment pipelines: {e}")
+            return None
+    
     def find_pipeline_by_name(self, pipeline_name: str) -> Optional[Dict[str, Any]]:
         """
         Find a deployment pipeline by its display name
@@ -91,14 +123,38 @@ class FabricDeployment:
                 
         return None
     
-    def deploy_all(self, pipeline_id: str, source_stage_order: int) -> bool:
+    def deploy_stage_content(self, pipeline_id: str, source_stage_order: int) -> bool:
         """
-        Deploy all artifacts from source stage to next stage using Fabric API
+        Deploy content from source stage to target stage using Fabric API
+        The Fabric API uses 'deploy' endpoint instead of 'deployAll'
         """
-        url = f"{self.base_url}/deploymentPipelines/{pipeline_id}/deployAll"
+        # Get pipeline stages to determine source and target stage IDs
+        stages = self.get_pipeline_stages(pipeline_id)
+        if not stages:
+            print("Failed to retrieve pipeline stages")
+            return False
+        
+        # Sort stages by order to find source and target
+        sorted_stages = sorted(stages, key=lambda x: x.get('order', 0))
+        
+        if source_stage_order >= len(sorted_stages) - 1:
+            print(f"Invalid source stage order: {source_stage_order}. Cannot deploy from the last stage.")
+            return False
+        
+        source_stage = sorted_stages[source_stage_order]
+        target_stage = sorted_stages[source_stage_order + 1]
+        
+        source_stage_id = source_stage.get('id')
+        target_stage_id = target_stage.get('id')
+        
+        print(f"Deploying from stage '{source_stage.get('displayName')}' to '{target_stage.get('displayName')}'")
+        
+        url = f"{self.base_url}/deploymentPipelines/{pipeline_id}/deploy"
         
         deploy_body = {
-            "sourceStageOrder": source_stage_order,
+            "sourceStageId": source_stage_id,
+            "targetStageId": target_stage_id,
+            "note": f"Automated deployment from stage {source_stage_order}",
             "options": {
                 "allowCreateArtifact": True,
                 "allowOverwriteArtifact": True
@@ -113,15 +169,24 @@ class FabricDeployment:
             )
             response.raise_for_status()
             
-            deploy_result = response.json()
-            operation_id = deploy_result.get('id')
-            
-            if operation_id:
-                print(f"Operation ID: {operation_id}")
-                return self.wait_for_operation(pipeline_id, operation_id)
+            # For Fabric API, the response may include operation details directly
+            # or we need to check the response headers for operation location
+            if response.status_code == 202:
+                # Long running operation
+                operation_location = response.headers.get('Location')
+                if operation_location:
+                    # Extract operation ID from location header
+                    operation_id = operation_location.split('/')[-1]
+                    print(f"Operation ID: {operation_id}")
+                    return self.wait_for_operation(pipeline_id, operation_id)
+                else:
+                    print("Deployment started but no operation ID found")
+                    return True
             else:
-                print("Failed to get operation ID from deployment request")
-                return False
+                # Immediate response
+                deploy_result = response.json()
+                print(f"Deployment completed: {deploy_result}")
+                return True
                 
         except requests.exceptions.RequestException as e:
             print(f"Error during deployment: {e}")
@@ -137,7 +202,7 @@ class FabricDeployment:
         """
         Wait for the deployment operation to complete using Fabric API
         """
-        url = f"{self.base_url}/deploymentPipelines/{pipeline_id}/operations/{operation_id}"
+        url = f"{self.base_url}/operations/{operation_id}"
         
         max_attempts = 120  # Maximum 10 minutes (120 * 5 seconds)
         attempts = 0
@@ -184,7 +249,7 @@ def main():
     client_secret = os.getenv('CLIENT_SECRET')
     pipeline_name = os.getenv('PIPELINE_NAME')
     stage_order = int(os.getenv('STAGE_ORDER', '0'))
-
+    
     # If not in environment variables, try command line arguments
     if not all([tenant_id, app_id, client_secret, pipeline_name]):
         if len(sys.argv) >= 5:
@@ -228,7 +293,7 @@ def main():
     print(f"Found pipeline with ID: {pipeline_id}")
     
     # Execute deployment
-    success = deployment.deploy_all(pipeline_id, stage_order)
+    success = deployment.deploy_stage_content(pipeline_id, stage_order)
     
     if success:
         print("Deployment completed successfully!")
