@@ -1,303 +1,67 @@
-# .github/workflows/fabric-deployment.yml
-name: Microsoft Fabric CI/CD Pipeline
+name: Power BI CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target environment'
-        required: true
-        default: 'uat'
-        type: choice
-        options:
-        - uat
-        - prod
-      force_deploy:
-        description: 'Force deployment (skip validation)'
-        required: false
-        default: false
-        type: boolean
-
-env:
-  FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
-  FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
-  FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
-  FABRIC_PIPELINE_NAME: ${{ secrets.FABRIC_PIPELINE_NAME }}  # "MY_PBIP_CICD_PL"
-  PYTHON_VERSION: '3.11'
 
 jobs:
-  # Validation and Testing Job
-  validate:
-    name: Validate Fabric Artifacts
-    runs-on: ubuntu-latest
-    outputs:
-      validation_status: ${{ steps.validate.outputs.status }}
-      
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install semantic-kernel-connectors-ai
-          pip install fabric-cicd
-          pip install azure-identity
-          pip install requests
-          pip install pyyaml
-
-      - name: Install Fabric CLI
-        run: |
-          # Install Fabric CLI
-          curl -L https://aka.ms/fabric-cli/install.sh | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Authenticate with Fabric
-        run: |
-          fabric login --service-principal \
-            --client-id ${{ env.FABRIC_CLIENT_ID }} \
-            --client-secret ${{ env.FABRIC_CLIENT_SECRET }} \
-            --tenant-id ${{ env.FABRIC_TENANT_ID }}
-
-      - name: Validate Fabric Artifacts
-        id: validate
-        run: |
-          python scripts/validate_artifacts.py
-          echo "status=success" >> $GITHUB_OUTPUT
-
-      - name: Upload Validation Report
-        uses: actions/upload-artifact@v3
-        with:
-          name: validation-report
-          path: reports/validation-report.json
-
-  # Git Integration and DEV Sync
-  sync-git-to-dev:
-    name: Sync Git to DEV Workspace
-    runs-on: ubuntu-latest
-    needs: validate
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    environment: 
-      name: development
-      
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install fabric-cicd azure-identity requests pyyaml
-
-      - name: Install Fabric CLI
-        run: |
-          curl -L https://aka.ms/fabric-cli/install.sh | bash
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Authenticate with Fabric
-        run: |
-          fabric login --service-principal \
-            --client-id ${{ env.FABRIC_CLIENT_ID }} \
-            --client-secret ${{ env.FABRIC_CLIENT_SECRET }} \
-            --tenant-id ${{ env.FABRIC_TENANT_ID }}
-
-      - name: Sync Git Repository to DEV Workspace
-        run: |
-          python scripts/sync_git_to_fabric.py --workspace-id ${{ secrets.DEV_WORKSPACE_ID }} --environment dev
-
-      - name: Verify DEV Workspace Sync
-        run: |
-          python scripts/verify_workspace_sync.py --workspace-id ${{ secrets.DEV_WORKSPACE_ID }}
-
-  # UAT Deployment with Approval (DEV → UAT via Deployment Pipeline)
   deploy-uat:
-    name: Deploy DEV to UAT
+    name: Deploy to UAT
     runs-on: ubuntu-latest
-    needs: [validate, sync-git-to-dev]
-    if: github.ref == 'refs/heads/main'
-    environment: 
-      name: UAT
-      # This creates an approval gate - requires manual approval in GitHub
-      
+    environment: UAT
+    
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Dependencies
+          python-version: '3.11'
+          
+      - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
-          pip install azure-identity requests pyyaml
-
-      - name: Deploy DEV to UAT using Fabric Pipeline
+          pip install requests
+          pip install python-dotenv
+          
+      - name: Deploy to UAT
         run: |
-          python scripts/deploy_fabric_improved.py \
-            --tenant-id ${{ env.FABRIC_TENANT_ID }} \
-            --client-id ${{ env.FABRIC_CLIENT_ID }} \
-            --client-secret ${{ env.FABRIC_CLIENT_SECRET }} \
-            --pipeline-name ${{ env.FABRIC_PIPELINE_NAME }} \
-            --source-stage-order 0 \
-            --environment uat \
-            --allow-create-artifact \
-            --allow-overwrite-artifact
+          python ./scripts/deploy_all.py
+        env:
+          TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          APP_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+          PIPELINE_NAME: ${{ secrets.FABRIC_PIPELINE_NAME }}
+          STAGE_ORDER: 0
 
-      - name: Run UAT Tests
-        run: |
-          python scripts/test_deployment.py --environment uat --workspace-id ${{ secrets.UAT_WORKSPACE_ID }}
-
-      - name: Generate UAT Report
-        run: |
-          python scripts/generate_report.py --environment uat
-
-      - name: Upload UAT Deployment Report
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: uat-deployment-report
-          path: reports/deployment_report_uat_*.json
-
-      - name: Comment PR with UAT Results
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            // Find the latest UAT report
-            const reportsDir = 'reports';
-            const files = fs.readdirSync(reportsDir).filter(f => f.startsWith('deployment_report_uat_'));
-            
-            if (files.length > 0) {
-              const latestReport = files.sort().pop();
-              const reportPath = path.join(reportsDir, latestReport);
-              const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-              
-              const status = report.success ? '✅ SUCCESS' : '❌ FAILED';
-              const comment = `## UAT Deployment ${status}
-              
-              **Pipeline:** ${report.pipeline_name}
-              **Environment:** ${report.environment}
-              **Timestamp:** ${report.timestamp}
-              **Operation ID:** ${report.operation_id}
-              `;
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: comment
-              });
-            }
-
-  # Production Deployment with Approval (UAT → PROD via Deployment Pipeline)
   deploy-prod:
-    name: Deploy UAT to PROD
+    name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [validate, deploy-uat]
-    if: github.ref == 'refs/heads/main'
-    environment: 
-      name: PROD
-      # This creates an approval gate - requires manual approval in GitHub
-      
+    environment: PROD
+    needs: deploy-uat
+    
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Dependencies
+          python-version: '3.11'
+          
+      - name: Install Python dependencies
         run: |
-          pip install --upgrade pip
-          pip install azure-identity requests pyyaml
-
-      - name: Create Production Backup
+          pip install requests
+          pip install python-dotenv
+          
+      - name: Deploy to Production
         run: |
-          python scripts/backup_fabric.py --environment prod --workspace-id ${{ secrets.PROD_WORKSPACE_ID }}
-
-      - name: Deploy UAT to PROD using Fabric Pipeline
-        run: |
-          python scripts/deploy_fabric_improved.py \
-            --tenant-id ${{ env.FABRIC_TENANT_ID }} \
-            --client-id ${{ env.FABRIC_CLIENT_ID }} \
-            --client-secret ${{ env.FABRIC_CLIENT_SECRET }} \
-            --pipeline-name ${{ env.FABRIC_PIPELINE_NAME }} \
-            --source-stage-order 1 \
-            --environment prod \
-            --allow-overwrite-artifact
-
-      - name: Run Production Smoke Tests
-        run: |
-          python scripts/test_deployment.py --environment prod --workspace-id ${{ secrets.PROD_WORKSPACE_ID }} --smoke-tests-only
-
-      - name: Generate Production Report
-        run: |
-          python scripts/generate_report.py --environment prod
-
-      - name: Upload Production Deployment Report
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: prod-deployment-report
-          path: reports/deployment_report_prod_*.json
-
-      - name: Notify Teams on Success
-        if: success()
-        run: |
-          python scripts/notify_teams.py --environment prod --status success
-
-      - name: Notify Teams on Failure
-        if: failure()
-        run: |
-          python scripts/notify_teams.py --environment prod --status failure
-
-  # Rollback Job (can be triggered manually)
-  rollback:
-    name: Rollback Deployment
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback == 'true'
-    environment: 
-      name: rollback-approval
-      
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install fabric-cicd azure-identity requests pyyaml
-
-      - name: Rollback Deployment
-        run: |
-          python scripts/rollback_fabric.py --environment ${{ github.event.inputs.environment }}
+          python ./scripts/deploy_all.py
+        env:
+          TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          APP_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+          PIPELINE_NAME: ${{ secrets.FABRIC_PIPELINE_NAME }}
+          STAGE_ORDER: 1
