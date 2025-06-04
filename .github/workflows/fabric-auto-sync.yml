@@ -1,15 +1,6 @@
 name: Fabric Auto-Sync DEV Workspace
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'fabric/**'
-  pull_request:
-    branches: [ main ]
-    types: [ closed ]
-    paths:
-      - 'fabric/**'
   workflow_dispatch:
     inputs:
       force_sync:
