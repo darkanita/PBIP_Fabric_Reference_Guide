@@ -484,14 +484,14 @@ These steps will complete your architecture implementation and enable the full F
    PBIP_Fabric_Reference_Guide/
    ├── .github/
    │   └── workflows/
-   │       ├── dev-to-uat-reports.yml
-   │       └── uat-to-prod-reports.yml
+   │       └── fabric-deployment.yml
    ├── fabric/
-   │   ├── workspace/
-   │   │   ├── FinancialSalesAnalytics_Dashboard_v1.0.Report/
-   │   │   └── FinancialSalesAnalytics_Dashboard_v1.0.SemanticModel/
+   │   └── workspace/
+   │       ├── FinancialSalesAnalytics_Dashboard_v1.0.Report/
+   │       ├── FinancialSalesAnalytics_Dashboard_v1.0.SemanticModel/
+   │       └── Readme.md
    ├── scripts/
-   │   └── deployall.ps1
+   │   └── deploy_all.py
    ├── .gitignore                    # ← Important for security
    └── README.md
    ```
@@ -791,10 +791,8 @@ az ad sp create-for-rbac --name "fabric-cicd-sp" --role contributor --scopes /su
 3. Select **Power BI Service**
 4. Choose **Delegated permissions**
 5. Add the following permissions:
-   - `Tenant.Read.All`
-   - `Workspace.ReadWrite.All`
-   - `Pipeline.Deploy`
-   - `Pipeline.Read.All`
+   - `Microsoft Graph.Group.Read.All`
+   - `Microsoft Graph.User.Read`
 
 6. Click **Grant admin consent** for your organization
 
@@ -823,6 +821,12 @@ Client Secret: [the secret value you just copied]
 5. Select role: **Admin**
 6. Click **Add**
 
+<p align="center">
+      <img src="images/management_Access_ws_dev.jpeg" width="200" alt="Power BI Project"/>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspace DEV &rarr; Manage access</strong>
+</p>
+
 #### 2.2 Add Service Principal to UAT Workspace
 1. Go to your **UAT Workspace** (`FABRIC-CATALYST-GH-STG`) in Fabric
 2. Click **Manage access**
@@ -841,12 +845,18 @@ Client Secret: [the secret value you just copied]
 
 #### 2.4 Add Service Principal to Deployment Pipeline
 1. Go to your **Deployment Pipeline** (`PowerBI-Reports-Lifecycle`) in Fabric
-2. Click **Settings** (gear icon)
-3. Click **Manage users**
-4. Click **Add user**
-5. Search for: `fabric-cicd-sp`
-6. Select role: **Admin**
-7. Click **Add**
+2. Click **Manage users**
+3. Click **Add people or groups**
+4. Search for: `fabric-cicd-sp`
+5. Select role: **Admin**
+6. Click **Add**
+
+<p align="center">
+      <img src="images/management_Access_pipeline.png" width="200" alt="Power BI Project"/>
+</p>
+<p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Deployment Pipeline &rarr; Manage access</strong>
+</p>
 
 ### Step 3: Configure GitHub Repository
 
@@ -858,7 +868,7 @@ your-repo/
 │   └── workflows/
 │       └── fabric-deployment.yml    # Main CI/CD workflow
 ├── scripts/
-│   └── deploy_all.py               # Python deployment script (already created)
+│   └── deploy_all.py               # Python deployment script 
 ├── fabric/
 │   └── workspace/                  # Your .pbip files from Git sync
 └── README.md                       # This documentation
@@ -895,7 +905,7 @@ PROD_WORKSPACE_ID=your-prod-workspace-id
 2. Configure **Deployment protection rules:**
 
    **Required reviewers:**
-   - ✅ Add reviewers (jesusher, darkanita as shown in your screenshot)
+   - ✅ Add reviewers
    - ✅ Prevent self-review (optional)
    
    **Wait timer:**
@@ -1030,9 +1040,15 @@ jobs:
    # ⚠️ IMPORTANT: After PR merge, manually sync DEV workspace
    # 1. Go to FABRIC-CATALYST-GH-DEV workspace
    # 2. Navigate to Source control or Git integration
-   # 3. Click "Update all" or "Sync" from Git → Workspace
+   # 3. Click "Update all"
    # 4. This step is currently manual - no auto-sync from Git to workspace
    ```
+   <p align="center">
+      <img src="images/ws_dev_sync_git_2.png" width="400" alt="Power BI Project"/>
+   </p>
+   <p align="center">
+   <strong>Figure: Microsoft Fabric &rarr; Workspace DEV &rarr; Sync from Git</strong>
+</p>
 
 4. **Automatic CI/CD Trigger:**
    ```bash
@@ -1048,71 +1064,13 @@ jobs:
    - **Approve UAT deployment** when prompted by reviewers
    - **Approve PROD deployment** when prompted by reviewers
 
-## Part 5: Complete Deployment Flow
+      <p align="center">
+      <img src="images/review_deployment_github.png" width="400" alt="Power BI Project"/>
+   </p>
+   <p align="center">
+   <strong>Figure: Github &rarr; Actions &rarr; Power BI CI/CD Pipeline</strong>
+</p>
 
-### 5.1 Automated Workflow Triggers
-
-**On Push to Main Branch:**
-```
-Feature Branch → Main Branch (PR Merge) 
-    ↓
-⚠️ MANUAL STEP: Update DEV Workspace from Git
-    ↓
-GitHub Actions Workflow Triggered (manual or push)
-    ↓
-UAT Approval Required → Deploy DEV to UAT (Fabric Pipeline)
-    ↓  
-PROD Approval Required → Deploy UAT to PROD (Fabric Pipeline)
-```
-
-**Manual Trigger:**
-- Can be triggered manually from GitHub Actions tab
-- Same approval flow applies
-- **Prerequisite:** Ensure DEV workspace is manually synced with main branch first
-
-### 5.2 Approval Process
-
-1. **UAT Deployment:**
-   - Triggered automatically after push to main
-   - **Reviewers:** jesusher, darkanita (as configured)
-   - Must be approved before deployment proceeds
-   - Deploys from DEV → UAT using `STAGE_ORDER: 0`
-
-2. **PROD Deployment:**
-   - Triggered automatically after successful UAT deployment
-   - **Reviewers:** Your configured PROD reviewers
-   - Optional wait timer before allowing approval
-   - Deploys from UAT → PROD using `STAGE_ORDER: 1`
-
-### 5.3 Monitoring and Troubleshooting
-
-#### GitHub Actions Dashboard
-- View all workflow runs in the `Actions` tab
-- Monitor deployment status and logs
-- Download logs for troubleshooting
-
-#### Common Issues and Solutions
-
-**Authentication Failures:**
-- Verify service principal credentials in secrets
-- Check Azure AD app registration permissions
-- Ensure service principal has admin access to all workspaces
-
-**Pipeline Not Found:**
-- Verify `FABRIC_PIPELINE_NAME` matches exact pipeline name (`PowerBI-Reports-Lifecycle`)
-- Check service principal has access to deployment pipeline
-- Ensure pipeline exists and is active
-
-**Deployment Failures:**
-- Check Fabric workspace capacity is active
-- Verify workspace assignments in deployment pipeline
-- Review parameter rules configuration
-
-**Git Sync Issues:**
-- Verify DEV workspace is connected to main branch
-- Check branch permissions and authentication
-- Ensure workspace has latest changes from Git
-- **Remember:** Git → Workspace sync is currently manual in Fabric
 
 ## Part 6: Benefits and Best Practices
 
@@ -1180,274 +1138,6 @@ Your Microsoft Fabric CI/CD pipeline is now ready for enterprise-scale Power BI 
 
 This guide will help you set up the complete CI/CD pipeline for Microsoft Fabric that automatically deploys from DEV → UAT → PROD using GitHub Actions with approval gates.
 
-## 🏗️ Architecture Overview
-
-```
-Git Repository (main branch) 
-    ↓ (Auto-sync)
-DEV Workspace (Git-managed)
-    ↓ (Approval required)
-UAT Workspace (via Deployment Pipeline)
-    ↓ (Approval required)
-PROD Workspace (via Deployment Pipeline)
-```
-
-## 📋 Prerequisites
-
-1. **Microsoft Fabric Workspace Setup:**
-   - DEV workspace connected to Git (this repository)
-   - UAT workspace configured in deployment pipeline
-   - PROD workspace configured in deployment pipeline
-   - Deployment pipeline created with DEV → UAT → PROD stages
-
-2. **Azure Service Principal:**
-   - Service principal with Fabric Admin permissions
-   - Access to all three workspaces
-   - Permissions to manage deployment pipelines
-
-3. **GitHub Repository:**
-   - This repository with the workflow files
-   - Branch protection rules configured
-   - Environment protection rules set up
-
-## 🔧 Required GitHub Secrets
-
-### Repository Secrets
-Add these secrets to your GitHub repository (`Settings > Secrets and variables > Actions`):
-
-```bash
-# Azure/Fabric Authentication
-FABRIC_TENANT_ID=your-azure-tenant-id
-FABRIC_CLIENT_ID=your-service-principal-client-id
-FABRIC_CLIENT_SECRET=your-service-principal-client-secret
-
-# Fabric Configuration
-FABRIC_PIPELINE_NAME=MY_PBIP_CICD_PL  # Your deployment pipeline name
-
-# Workspace IDs
-DEV_WORKSPACE_ID=your-dev-workspace-id
-UAT_WORKSPACE_ID=your-uat-workspace-id
-PROD_WORKSPACE_ID=your-prod-workspace-id
-
-# Notifications (Optional)
-TEAMS_WEBHOOK_URL=your-teams-webhook-url
-SLACK_WEBHOOK_URL=your-slack-webhook-url
-```
-
-### Environment Secrets
-For additional security, you can also set environment-specific secrets:
-
-#### UAT Environment
-- `UAT_WORKSPACE_ID` (if different from repository secret)
-
-#### PROD Environment  
-- `PROD_WORKSPACE_ID` (if different from repository secret)
-
-## 🛡️ GitHub Environment Setup
-
-### 1. Create Environments
-Go to `Settings > Environments` and create:
-
-- **development** (for DEV workspace sync)
-- **UAT** (for UAT deployments)
-- **PROD** (for production deployments)
-
-### 2. Configure Environment Protection Rules
-
-#### UAT Environment
-- ✅ **Required reviewers:** Add team members who can approve UAT deployments
-- ✅ **Wait timer:** 0 minutes (optional: add delay)
-- ✅ **Deployment branches:** `main` branch only
-
-#### PROD Environment
-- ✅ **Required reviewers:** Add senior team members/release managers
-- ✅ **Wait timer:** 5 minutes (cooling period)
-- ✅ **Deployment branches:** `main` branch only
-
-### 3. Branch Protection Rules
-Protect your `main` branch (`Settings > Branches`):
-
-- ✅ **Require a pull request before merging**
-- ✅ **Require status checks to pass before merging**
-  - Add check: `Validate Fabric Artifacts`
-- ✅ **Require branches to be up to date before merging**
-- ✅ **Require linear history**
-
-## 📁 Repository Structure
-
-Ensure your repository has this structure:
-
-```
-your-repo/
-├── .github/
-│   └── workflows/
-│       └── fabric-deployment.yml
-├── scripts/
-│   ├── deploy_fabric_improved.py
-│   ├── sync_git_to_fabric.py
-│   ├── test_deployment.py
-│   ├── generate_report.py
-│   ├── notify_teams.py
-│   └── validate_artifacts.py
-├── config/
-│   ├── dev.yaml
-│   ├── uat.yaml
-│   └── prod.yaml
-├── reports/
-│   └── .gitkeep
-└── README.md
-```
-
-## 🚀 Deployment Flow
-
-### Automatic Workflow Triggers
-
-1. **Push to `main` branch:**
-   ```
-   Validate → Sync Git to DEV → Deploy DEV to UAT (with approval) → Deploy UAT to PROD (with approval)
-   ```
-
-2. **Manual workflow dispatch:**
-   - Can target specific environments
-   - Can force deployment (skip validation)
-
-### Approval Process
-
-1. **UAT Deployment:**
-   - Triggered automatically after successful Git sync to DEV
-   - Requires manual approval from UAT reviewers
-   - Runs UAT tests after deployment
-   - Generates deployment report
-
-2. **PROD Deployment:**
-   - Triggered automatically after successful UAT deployment
-   - Requires manual approval from PROD reviewers
-   - Creates backup before deployment
-   - Runs smoke tests only
-   - Sends notifications to Teams/Slack
-
-## 🔍 Monitoring and Notifications
-
-### GitHub Actions Dashboard
-- View all workflow runs in the `Actions` tab
-- Monitor deployment status and logs
-- Download deployment reports as artifacts
-
-### Teams/Slack Notifications
-Configure webhook URLs to receive notifications for:
-- ✅ Successful deployments
-- ❌ Failed deployments
-- ⚠️ Approval requests
-
-### Deployment Reports
-Each deployment generates detailed reports available as GitHub artifacts:
-- Deployment summary with operation IDs
-- Test results and validation status
-- Performance metrics and timing
-
-## 🛠️ Service Principal Setup
-
-### Required Permissions
-Your service principal needs these permissions:
-
-**Azure Active Directory:**
-- Application permissions for Power BI Service
-
-**Microsoft Fabric:**
-- Fabric Administrator role (or specific workspace permissions)
-- Access to all workspaces (DEV, UAT, PROD)
-- Permission to manage deployment pipelines
-
-### Permission Setup Script
-```powershell
-# Connect to Power BI
-Connect-PowerBIServiceAccount
-
-# Add service principal to workspace (repeat for each workspace)
-Add-PowerBIWorkspaceUser -WorkspaceId "your-workspace-id" -UserPrincipalName "your-sp-client-id" -AccessRight Admin -PrincipalType App
-
-# Grant deployment pipeline access
-Add-PowerBIPipelineUser -PipelineId "your-pipeline-id" -UserPrincipalName "your-sp-client-id" -AccessRight Admin -PrincipalType App
-```
-
-## 🔄 Migration from Azure DevOps
-
-If you're migrating from Azure DevOps:
-
-1. **Export existing pipeline variables:**
-   ```bash
-   # Your existing variables from Azure DevOps variable group 'pbipdeploysecrets'
-   TenantId → FABRIC_TENANT_ID
-   AppId → FABRIC_CLIENT_ID  
-   ClientSecret → FABRIC_CLIENT_SECRET
-   ```
-
-2. **Update deployment pipeline name:**
-   - Set `FABRIC_PIPELINE_NAME` to your existing pipeline name
-   - Default: `MY_PBIP_CICD_PL`
-
-3. **Validate workspace IDs:**
-   - Ensure workspace IDs match your current setup
-   - Test connectivity with new service principal
-
-## 🧪 Testing the Setup
-
-### 1. Test Authentication
-```bash
-# Test with GitHub CLI or manual trigger
-gh workflow run fabric-deployment.yml --ref main
-```
-
-### 2. Verify Git Integration
-- Make a small change to a Fabric artifact
-- Commit and push to `main` branch
-- Verify DEV workspace updates automatically
-
-### 3. Test Approval Flow
-- Wait for UAT deployment approval request
-- Approve and monitor deployment progress
-- Verify UAT workspace receives updates
-
-### 4. Validate Notifications
-- Check Teams/Slack channels for notifications
-- Verify deployment reports are generated
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**Authentication Failures:**
-- Verify service principal credentials
-- Check Azure AD app registration
-- Ensure proper permissions are granted
-
-**Git Sync Issues:**
-- Verify DEV workspace is connected to Git
-- Check branch permissions
-- Ensure service principal has Git integration rights
-
-**Deployment Pipeline Failures:**
-- Verify pipeline configuration
-- Check workspace permissions
-- Validate artifact compatibility
-
-**Approval Not Triggering:**
-- Check environment protection rules
-- Verify reviewers have repository access
-- Ensure workflow has proper permissions
-
-### Debug Commands
-```bash
-# View workflow logs
-gh run list --workflow=fabric-deployment.yml
-
-# Download artifacts
-gh run download [run-id]
-
-# Re-run failed jobs
-gh run rerun [run-id] --failed
-```
-
 ## 📚 Additional Resources
 
 - [Microsoft Fabric REST API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/)
@@ -1462,7 +1152,3 @@ For issues or questions:
 2. Review deployment reports in artifacts
 3. Verify service principal permissions
 4. Contact your Fabric administrator
-
----
-
-**Note:** This setup replaces your existing Azure DevOps pipeline with a more robust GitHub Actions solution that provides better Git integration, approval workflows, and comprehensive reporting.
