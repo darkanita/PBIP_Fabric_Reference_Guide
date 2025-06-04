@@ -1140,6 +1140,19 @@ Your Microsoft Fabric CI/CD pipeline is now ready for enterprise-scale Power BI 
 
 This guide will help you set up the complete CI/CD pipeline for Microsoft Fabric that automatically deploys from DEV → UAT → PROD using GitHub Actions with approval gates.
 
+## 🎥 Video Tutorial
+
+For a step-by-step walkthrough of the lifecycle process, watch the following video:
+<p align="center">
+   <video width="600" controls>
+      <source src="media/Power BI Reports Lifecycle Management.mp4" type="video/mp4">
+   </video>
+</p>
+
+<p align="center">
+   <strong>Figure: End-to-End Power BI Reports Lifecycle Management</strong>
+</p>
+
 ## 📚 Additional Resources
 
 - [Microsoft Fabric REST API Documentation](https://learn.microsoft.com/en-us/rest/api/fabric/)
