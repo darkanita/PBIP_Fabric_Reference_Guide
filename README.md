@@ -1142,15 +1142,10 @@ This guide will help you set up the complete CI/CD pipeline for Microsoft Fabric
 
 ## 🎥 Video Tutorial
 
-For a step-by-step walkthrough of the lifecycle process, watch the following video:
-<p align="center">
-   <video width="600" controls>
-      <source src="media/Power BI Reports Lifecycle Management.mp4" type="video/mp4">
-   </video>
-</p>
+For a step-by-step walkthrough of the lifecycle process, [download the video here](media/Power_BI_Reports_Lifecycle_Management.mp4).
 
 <p align="center">
-   <strong>Figure: End-to-End Power BI Reports Lifecycle Management</strong>
+   <strong>Download: Power BI Reports Lifecycle Management (MP4)</strong>
 </p>
 
 ## 📚 Additional Resources
