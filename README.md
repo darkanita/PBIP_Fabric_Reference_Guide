@@ -946,6 +946,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'fabric/**'
   workflow_dispatch:
 
 jobs:
@@ -1064,7 +1066,7 @@ jobs:
    - **Approve UAT deployment** when prompted by reviewers
    - **Approve PROD deployment** when prompted by reviewers
 
-      <p align="center">
+<p align="center">
       <img src="images/review_deployment_github.png" width="400" alt="Power BI Project"/>
    </p>
    <p align="center">
