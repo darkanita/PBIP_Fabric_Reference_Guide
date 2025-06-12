@@ -183,6 +183,10 @@ Power BI Desktop must be configured to support the new .pbip format for seamless
 
 Configure parameters in **Power Query Editor** to support multiple environments.
 
+> **⚠️ Pro TIP:**
+> - **Create a Power BI Template with these parameters to save time on new reports.**
+
+
 **Step 1: Open Power Query Editor**
 1. Click **"Transform Data"** in Power BI Desktop
 2. Navigate to **Home → Manage Parameters**
